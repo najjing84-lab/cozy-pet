@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#ffe9d6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>나만의 야생동물</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header id="top">
+      <div id="title"></div>
+      <div id="coins"><span class="coin-icon">🪙</span><span id="coin-count">0</span></div>
+    </header>
+
+    <main id="room">
+      <div id="room-floor"></div>
+    </main>
+
+    <nav id="bar">
+      <button id="btn-feed" class="big-btn"><span class="icon">🍖</span><span class="label">밥 주기</span></button>
+      <button id="btn-egg" class="big-btn main"><span class="icon">🥚</span><span class="label" id="egg-label">알 뽑기</span></button>
+      <button id="btn-dex" class="big-btn"><span class="icon">📖</span><span class="label">도감</span></button>
+    </nav>
+
+    <!-- 알 깨기 화면 -->
+    <section id="egg-screen" class="overlay hidden">
+      <div id="egg-hint">알을 톡톡 두드려요!</div>
+      <div id="egg-wrap">
+        <div id="egg"><div id="egg-cracks"></div></div>
+      </div>
+      <div id="reveal" class="hidden">
+        <div id="reveal-burst"></div>
+        <div id="reveal-animal"></div>
+        <div id="reveal-tier"></div>
+        <div id="reveal-name"></div>
+        <div id="reveal-note"></div>
+        <button id="reveal-ok" class="pill-btn">좋아요!</button>
+      </div>
+    </section>
+
+    <!-- 도감 화면 -->
+    <section id="dex-screen" class="overlay hidden">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h2>도감 <span id="dex-progress"></span></h2>
+        </div>
+        <div id="dex-grid"></div>
+        <button id="dex-close" class="pill-btn">닫기</button>
+      </div>
+    </section>
+
+    <div id="toast" class="hidden"></div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
