@@ -38,6 +38,23 @@ window.GAME_CONFIG = {
     { id: 'adult', name: '어른',   min: 100, scale: 1.0 },
   ],
 
+  // 산책: 야생 들판을 뛰어다니며 보물을 주워요
+  walk: {
+    seconds: 30,           // 산책 시간
+    cooldownMs: 180000,    // 다음 산책까지 쉬는 시간(3분)
+    affinity: 5,           // 산책 한 번에 오르는 친밀도
+    spawnEveryMs: 1500,    // 보물이 나타나는 간격
+    // 들판에서 주울 수 있는 것: weight가 클수록 자주 나와요
+    items: [
+      { emoji: '🪙', coins: 2,  weight: 50 },
+      { emoji: '🍓', coins: 3,  weight: 18 },
+      { emoji: '🌸', coins: 3,  weight: 18 },
+      { emoji: '🦴', coins: 5,  weight: 10 },
+      { emoji: '💎', coins: 20, weight: 3 },
+      { emoji: '🥚', egg: true, weight: 1 },  // 둥지에 빈칸이 있으면 알을 주워 와요
+    ],
+  },
+
   // 코인 얻기
   petCoins: 2,          // 쓰다듬기 한 번
   petCooldownMs: 1200,  // 같은 동물을 다시 쓰다듬어 코인을 받기까지

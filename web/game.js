@@ -12,7 +12,7 @@
   // ---------- 저장 ----------
   function newState() {
     const owned = {};
-    if (C.starterAnimal) owned[C.starterAnimal] = { count: 1, affinity: 0 };
+    // 첫 동물은 타이틀 화면에서 알을 깨서 만나요
     return { coins: C.startCoins, owned, sincePity: 0, eggsOpened: 0, lastSeen: Date.now(), lastFeed: 0, nest: [], dailyDay: '', streak: 0 };
   }
 
@@ -185,6 +185,7 @@
     const r = pet.el.getBoundingClientRect();
     const cx = r.left - b.left + r.width / 2 + (Math.random() * 30 - 15);
     const cy = r.top - b.top;
+    hideHandHint();
     floatAt(room, cx, cy, ['💗', '💕', '💖'][Math.floor(Math.random() * 3)], 'heart');
     playAnim(pet.el, 'happy');
     const o = state.owned[id];
@@ -454,12 +455,230 @@
 
   $('#reveal-ok').addEventListener('click', () => {
     eggScreen.classList.add('hidden');
-    const { animal } = hatch;
+    const { animal, first } = hatch;
     hatch = null;
     renderRoom();
     renderCoins(true);
     const p = pets.get(animal.id);
     if (p) { applyStage(p, animal.id); playAnim(p.el, 'happy'); }
+    if (first) setTimeout(() => {
+      showHandHint();
+      toast(`${C.playerTitle}, 반가워요! 저를 쓰다듬어 주세요`);
+    }, 700);
+  });
+
+  // 처음 온 사람에게 동물을 문지르라는 손가락 안내
+  function showHandHint() {
+    const p = [...pets.values()][0];
+    if (!p || state.tutorialDone) return;
+    const app = $('#app').getBoundingClientRect();
+    const r = p.el.getBoundingClientRect();
+    const h = $('#hand-hint');
+    h.style.left = `${r.left - app.left + r.width / 2 - 23}px`;
+    h.style.top = `${r.top - app.top + r.height * 0.45}px`;
+    h.classList.remove('hidden');
+  }
+  function hideHandHint() {
+    if (state.tutorialDone) return;
+    state.tutorialDone = true;
+    $('#hand-hint').classList.add('hidden');
+    save();
+  }
+
+  // ---------- 산책 ----------
+  // 친구 한 마리와 야생 들판에 나가 마음대로 뛰어다니게 하고, 보물을 주워요.
+  const WALK = C.walk;
+  const walkScreen = $('#walk-screen');
+  const walkWorld = $('#walk-world');
+  const svgUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+  const walkLayers = [
+    { el: $('.wl-far'), f: 0.2, svg: '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="100" preserveAspectRatio="none"><path d="M0 100 L0 62 Q40 24 90 50 Q140 6 210 46 Q260 18 320 52 Q370 28 420 62 L420 100 Z" fill="#b9dfb0"/></svg>' },
+    { el: $('.wl-mid'), f: 0.5, svg: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="100" preserveAspectRatio="none"><path d="M0 100 L0 58 Q80 30 160 56 Q240 80 320 58 L320 100 Z" fill="#9ad385"/><rect x="58" y="40" width="8" height="22" fill="#9a6a44"/><circle cx="62" cy="34" r="18" fill="#62b05c"/><circle cx="52" cy="42" r="12" fill="#6fbb66"/><rect x="232" y="50" width="7" height="20" fill="#9a6a44"/><circle cx="236" cy="44" r="15" fill="#5aa957"/></svg>' },
+    { el: $('.wl-ground'), f: 1, svg: '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="100" preserveAspectRatio="none"><rect width="240" height="100" fill="#86c96b"/><path d="M0 8 Q20 0 40 8 Q60 0 80 8 Q100 0 120 8 Q140 0 160 8 Q180 0 200 8 Q220 0 240 8 L240 0 L0 0 Z" fill="#a6db8c"/><path d="M30 40 l4 -10 l4 10 M150 70 l4 -10 l4 10 M200 30 l3 -8 l3 8" stroke="#5fa94e" stroke-width="3" fill="none"/><circle cx="70" cy="30" r="4" fill="#ffffff"/><circle cx="70" cy="30" r="1.6" fill="#ffd166"/><circle cx="120" cy="62" r="4" fill="#ff9aa2"/><circle cx="120" cy="62" r="1.6" fill="#fff4d6"/><circle cx="210" cy="78" r="4" fill="#c9a6ff"/><circle cx="210" cy="78" r="1.6" fill="#fff4d6"/></svg>' },
+  ];
+  for (const l of walkLayers) l.el.style.backgroundImage = svgUrl(l.svg);
+
+  let walk = null;
+  const walkLeft = () => Math.max(0, (state.lastWalk || 0) + WALK.cooldownMs - Date.now());
+
+  const walkBtn = $('#btn-walk');
+  function updateWalkBtn() {
+    const left = walkLeft();
+    const label = walkBtn.querySelector('.label');
+    if (left > 0) {
+      const sec = Math.ceil(left / 1000);
+      label.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+      walkBtn.classList.add('poor');
+    } else {
+      label.textContent = '산책';
+      walkBtn.classList.remove('poor');
+    }
+  }
+  setInterval(updateWalkBtn, 1000);
+
+  walkBtn.addEventListener('click', () => {
+    const ids = Object.keys(state.owned);
+    if (!ids.length) return;
+    const left = walkLeft();
+    if (left > 0) {
+      toast(`친구들이 쉬고 있어요. ${fmtLeft(left)} 뒤에 다시 나가요!`);
+      return;
+    }
+    if (ids.length === 1) { startWalk(ids[0]); return; }
+    const grid = $('#walk-pick-grid');
+    grid.innerHTML = '';
+    for (const id of ids) {
+      const a = animalById[id];
+      const b = document.createElement('button');
+      b.innerHTML = `<span class="face">${animalFace(a)}</span>${a.name}`;
+      b.addEventListener('click', () => { $('#walk-pick').classList.add('hidden'); startWalk(id); });
+      grid.appendChild(b);
+    }
+    $('#walk-pick').classList.remove('hidden');
+  });
+  $('#walk-pick-close').addEventListener('click', () => $('#walk-pick').classList.add('hidden'));
+
+  function pickWalkItem() {
+    const sum = WALK.items.reduce((s, it) => s + it.weight, 0);
+    let r = Math.random() * sum;
+    for (const it of WALK.items) { if ((r -= it.weight) < 0) return it; }
+    return WALK.items[0];
+  }
+
+  function startWalk(id) {
+    walkWorld.innerHTML = '';
+    const el = document.createElement('div');
+    el.className = 'walker running';
+    el.innerHTML = `<div class="inner">${animalFace(animalById[id])}</div>`;
+    walkWorld.appendChild(el);
+    const w = walkScreen.clientWidth || 360;
+    walk = {
+      id, el, wx: 0, camX: -w / 2, target: 200, speed: 260, dir: 1, mode: 'run', until: 0,
+      t0: performance.now(), last: performance.now(), lastSpawn: 0, coins: 0, found: {}, eggs: 0, items: [], done: false,
+    };
+    el.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (!walk || walk.done) return;
+      playAnim(el, 'jump');
+      const r = el.getBoundingClientRect(); const b = walkScreen.getBoundingClientRect();
+      floatAt(walkScreen, r.left - b.left + r.width / 2, r.top - b.top + 20, '💗', 'heart');
+      state.owned[id].affinity += 1;
+      if (navigator.vibrate) navigator.vibrate(10);
+    });
+    $('#walk-count').textContent = '🪙 0';
+    $('#walk-result').classList.add('hidden');
+    $('#walk-hint').classList.remove('hidden');
+    walkScreen.classList.remove('hidden');
+    requestAnimationFrame(walkLoop);
+  }
+
+  function newWalkTarget() {
+    // 대체로 앞으로, 가끔 뒤로 돌아서 들판을 누비듯이
+    const forward = Math.random() < 0.72 ? 1 : -1;
+    walk.target = walk.wx + forward * (140 + Math.random() * 320);
+    walk.speed = 200 + Math.random() * 140;
+    walk.mode = 'run';
+  }
+
+  function collectTreasure(it) {
+    if (it.got) return;
+    it.got = true;
+    it.el.classList.add('got');
+    setTimeout(() => it.el.remove(), 450);
+    walk.found[it.def.emoji] = (walk.found[it.def.emoji] || 0) + 1;
+    let gain = it.def.coins || 0;
+    if (it.def.egg) {
+      if (state.nest.length < C.nestSlots) walk.eggs += 1;
+      else gain += 30; // 둥지가 가득 차면 코인으로
+    }
+    walk.coins += gain;
+    $('#walk-count').textContent = `🪙 ${walk.coins}`;
+    const b = walkScreen.getBoundingClientRect(); const r = it.el.getBoundingClientRect();
+    floatAt(walkScreen, r.left - b.left + 10, r.top - b.top - 10, it.def.egg ? '알!' : `+${gain}`, 'float-text');
+    if (navigator.vibrate) navigator.vibrate(8);
+  }
+
+  function walkLoop(now) {
+    if (!walk || walk.done) return;
+    const dt = Math.min(0.05, (now - walk.last) / 1000);
+    walk.last = now;
+    const w = walkScreen.clientWidth;
+
+    // 동물 움직임: 달리다가 가끔 멈춰서 킁킁
+    if (walk.mode === 'sniff') {
+      if (now > walk.until) newWalkTarget();
+    } else {
+      const d = walk.target - walk.wx;
+      walk.dir = Math.sign(d) || walk.dir;
+      walk.wx += walk.dir * Math.min(Math.abs(d), walk.speed * dt);
+      if (Math.abs(d) < 2) {
+        if (Math.random() < 0.3) { walk.mode = 'sniff'; walk.until = now + 700 + Math.random() * 900; }
+        else newWalkTarget();
+      }
+    }
+    walk.el.classList.toggle('running', walk.mode === 'run');
+    walk.el.classList.toggle('sniff', walk.mode === 'sniff');
+    walk.el.classList.toggle('flip', walk.dir < 0);
+
+    // 카메라가 천천히 따라가요
+    walk.camX += (walk.wx - w / 2 - walk.camX) * Math.min(1, dt * 2.5);
+    walk.el.style.left = `${walk.wx - walk.camX}px`;
+    for (const l of walkLayers) l.el.style.backgroundPosition = `${-walk.camX * l.f}px 100%`;
+
+    // 보물 나타나기
+    if (now - walk.lastSpawn > WALK.spawnEveryMs) {
+      walk.lastSpawn = now;
+      const def = pickWalkItem();
+      const el = document.createElement('div');
+      el.className = 'treasure';
+      el.textContent = def.emoji;
+      const it = { def, el, wx: walk.wx + walk.dir * (120 + Math.random() * w * 0.5) + (Math.random() * 80 - 40) };
+      el.addEventListener('pointerdown', (e) => { e.stopPropagation(); collectTreasure(it); });
+      walkWorld.appendChild(el);
+      walk.items.push(it);
+    }
+    walk.items = walk.items.filter((it) => {
+      if (it.got) return false;
+      const sx = it.wx - walk.camX;
+      if (sx < -w || sx > w * 2) { it.el.remove(); return false; }
+      it.el.style.left = `${sx}px`;
+      if (Math.abs(it.wx - walk.wx) < 40) collectTreasure(it); // 지나가면서 물어와요
+      return true;
+    });
+
+    const frac = (now - walk.t0) / (WALK.seconds * 1000);
+    $('#walk-timer-fill').style.width = `${Math.max(0, 1 - frac) * 100}%`;
+    if (now - walk.t0 > 2500) $('#walk-hint').classList.add('hidden');
+    if (frac >= 1) endWalk();
+    else requestAnimationFrame(walkLoop);
+  }
+
+  function endWalk() {
+    walk.done = true;
+    walk.el.classList.remove('running', 'sniff');
+    state.lastWalk = Date.now();
+    state.owned[walk.id].affinity += WALK.affinity;
+    for (let i = 0; i < walk.eggs; i++) addToNest(null);
+    addCoins(walk.coins);
+    const a = animalById[walk.id];
+    $('#walk-result-animal').innerHTML = animalFace(a);
+    const list = Object.entries(walk.found).map(([e, n]) => `${e}×${n}`).join('  ');
+    $('#walk-result-items').textContent = list || '이번엔 냄새만 맡고 왔어요';
+    $('#walk-result-text').textContent =
+      `${a.name}이(가) 신나게 뛰어놀았어요! 코인 +${walk.coins} · 친밀도 +${WALK.affinity}` +
+      (walk.eggs ? ` · 알 ${walk.eggs}개를 둥지에 넣었어요` : '');
+    $('#walk-result').classList.remove('hidden');
+  }
+
+  $('#walk-home').addEventListener('click', () => {
+    walkScreen.classList.add('hidden');
+    walkWorld.innerHTML = '';
+    const id = walk && walk.id;
+    walk = null;
+    const p = id && pets.get(id);
+    if (p) { applyStage(p, id); playAnim(p.el, 'happy'); }
+    renderNest();
+    updateWalkBtn();
   });
 
   // ---------- 도감 ----------
@@ -488,29 +707,87 @@
   $('#dex-screen').addEventListener('click', (e) => { if (e.target.id === 'dex-screen') e.target.classList.add('hidden'); });
 
   // ---------- 시작 ----------
+  // 닫아둔 동안 동물들이 모은 선물 코인을 받고, 보여줄 인사말을 돌려줌
   function welcomeBack() {
-    if (!saved) {
-      setTimeout(() => toast(`${C.playerTitle}, 반가워요! 저를 쓰다듬어 주세요`), 600);
-      return;
-    }
+    if (!Object.keys(state.owned).length) return '';
     const mins = Math.min((Date.now() - state.lastSeen) / 60000, C.offlineMaxMin);
     const gift = Math.floor(mins * C.offlineCoinsPerMin * Object.keys(state.owned).length);
-    if (gift > 0) {
-      state.coins += gift;
-      setTimeout(() => toast(`${C.playerTitle}, 보고 싶었어요! 선물 코인 +${gift}`), 600);
+    if (gift <= 0) return '';
+    state.coins += gift;
+    return `${C.playerTitle}, 보고 싶었어요! 선물 코인 +${gift}`;
+  }
+  const welcomeMsg = welcomeBack();
+
+  // ---------- 타이틀 화면 ----------
+  const isNewPlayer = Object.keys(state.owned).length === 0;
+  function setupTitle() {
+    const words = C.name.split(' ');
+    $('#logo-small').textContent = words.length > 1 ? words.slice(0, -1).join(' ') : '';
+    const colors = ['#ffd166', '#ff9aa2', '#8ecbff', '#9be3a6', '#c9a6ff', '#ffb347'];
+    $('#logo-big').innerHTML = [...words[words.length - 1]].map((ch, i) =>
+      `<span style="--c:${colors[i % colors.length]};--d:${i * 0.12}s">${ch}</span>`).join('');
+    // 동물 퍼레이드 (끊김 없이 돌도록 두 번 넣음)
+    const list = C.animals.map((a, i) => `<div class="pa" style="--d:${(i % 4) * 0.15}s">${animalFace(a)}</div>`).join('');
+    $('#parade-track').innerHTML = list + list;
+    // 떠다니는 하트와 별
+    const sky = $('#title-sky');
+    for (let i = 0; i < 14; i++) {
+      const s = document.createElement('span');
+      s.textContent = ['💗', '⭐', '✨', '🫧'][i % 4];
+      s.style.left = `${Math.random() * 100}%`;
+      s.style.top = `${100 + Math.random() * 20}%`;
+      s.style.fontSize = `${14 + Math.random() * 18}px`;
+      s.style.animationDuration = `${8 + Math.random() * 8}s`;
+      s.style.animationDelay = `${-Math.random() * 12}s`;
+      sky.appendChild(s);
     }
+    const have = Object.keys(state.owned).length;
+    $('#title-cta').textContent = isNewPlayer ? '톡! 눌러서 첫 알 깨기' : '톡! 눌러서 시작';
+    $('#title-sub').textContent = isNewPlayer
+      ? `${C.animals.length}종의 동물 친구가 알 속에서 기다려요`
+      : `친구 ${have}마리가 기다리고 있어요 · 도감 ${have}/${C.animals.length}`;
   }
 
-  welcomeBack();
+  let titleStarted = false;
+  function startFromTitle() {
+    if (titleStarted) return;
+    titleStarted = true;
+    const ts = $('#title-screen');
+    if (isNewPlayer) {
+      $('#title-egg').classList.add('crack');
+      if (navigator.vibrate) navigator.vibrate(30);
+      setTimeout(() => {
+        // 첫 알: 시작 동물이 나오는 알을 바로 깨기
+        const animal = animalById[C.starterAnimal] || C.animals[0];
+        const tier = tierById[animal.tier];
+        state.owned[animal.id] = { count: 1, affinity: 0 };
+        state.eggsOpened += 1;
+        save();
+        hatch = { tier, animal, isNew: true, taps: 0, first: true };
+        openEgg(tier);
+        ts.classList.add('leave');
+        setTimeout(() => ts.classList.add('hidden'), 450);
+      }, 600);
+    } else {
+      ts.classList.add('leave');
+      setTimeout(() => ts.classList.add('hidden'), 450);
+      renderCoins(true);
+      if (welcomeMsg) setTimeout(() => toast(welcomeMsg), 500);
+    }
+  }
+  $('#title-screen').addEventListener('click', startFromTitle);
+
+  setupTitle();
   renderCoins();
   renderNest();
   updateFeedBtn();
+  updateWalkBtn();
   // 방 크기가 정해진 뒤에 동물 배치
   requestAnimationFrame(() => { renderRoom(); save(); });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) save();
-    else { welcomeBack(); renderCoins(true); renderNest(); save(); }
+    else { const m = welcomeBack(); if (m) toast(m); renderCoins(true); renderNest(); save(); }
   });
   window.addEventListener('pagehide', save);
 })();
