@@ -12,7 +12,7 @@
   // ---------- 저장 ----------
   function newState() {
     const owned = {};
-    if (C.starterAnimal) owned[C.starterAnimal] = { count: 1, affinity: 0 };
+    // 첫 동물은 타이틀 화면에서 알을 깨서 만나요
     return { coins: C.startCoins, owned, sincePity: 0, eggsOpened: 0, lastSeen: Date.now(), lastFeed: 0, nest: [], dailyDay: '', streak: 0 };
   }
 
@@ -185,6 +185,7 @@
     const r = pet.el.getBoundingClientRect();
     const cx = r.left - b.left + r.width / 2 + (Math.random() * 30 - 15);
     const cy = r.top - b.top;
+    hideHandHint();
     floatAt(room, cx, cy, ['💗', '💕', '💖'][Math.floor(Math.random() * 3)], 'heart');
     playAnim(pet.el, 'happy');
     const o = state.owned[id];
@@ -454,13 +455,35 @@
 
   $('#reveal-ok').addEventListener('click', () => {
     eggScreen.classList.add('hidden');
-    const { animal } = hatch;
+    const { animal, first } = hatch;
     hatch = null;
     renderRoom();
     renderCoins(true);
     const p = pets.get(animal.id);
     if (p) { applyStage(p, animal.id); playAnim(p.el, 'happy'); }
+    if (first) setTimeout(() => {
+      showHandHint();
+      toast(`${C.playerTitle}, 반가워요! 저를 쓰다듬어 주세요`);
+    }, 700);
   });
+
+  // 처음 온 사람에게 동물을 문지르라는 손가락 안내
+  function showHandHint() {
+    const p = [...pets.values()][0];
+    if (!p || state.tutorialDone) return;
+    const app = $('#app').getBoundingClientRect();
+    const r = p.el.getBoundingClientRect();
+    const h = $('#hand-hint');
+    h.style.left = `${r.left - app.left + r.width / 2 - 23}px`;
+    h.style.top = `${r.top - app.top + r.height * 0.45}px`;
+    h.classList.remove('hidden');
+  }
+  function hideHandHint() {
+    if (state.tutorialDone) return;
+    state.tutorialDone = true;
+    $('#hand-hint').classList.add('hidden');
+    save();
+  }
 
   // ---------- 도감 ----------
   function renderDex() {
@@ -488,20 +511,77 @@
   $('#dex-screen').addEventListener('click', (e) => { if (e.target.id === 'dex-screen') e.target.classList.add('hidden'); });
 
   // ---------- 시작 ----------
+  // 닫아둔 동안 동물들이 모은 선물 코인을 받고, 보여줄 인사말을 돌려줌
   function welcomeBack() {
-    if (!saved) {
-      setTimeout(() => toast(`${C.playerTitle}, 반가워요! 저를 쓰다듬어 주세요`), 600);
-      return;
-    }
+    if (!Object.keys(state.owned).length) return '';
     const mins = Math.min((Date.now() - state.lastSeen) / 60000, C.offlineMaxMin);
     const gift = Math.floor(mins * C.offlineCoinsPerMin * Object.keys(state.owned).length);
-    if (gift > 0) {
-      state.coins += gift;
-      setTimeout(() => toast(`${C.playerTitle}, 보고 싶었어요! 선물 코인 +${gift}`), 600);
+    if (gift <= 0) return '';
+    state.coins += gift;
+    return `${C.playerTitle}, 보고 싶었어요! 선물 코인 +${gift}`;
+  }
+  const welcomeMsg = welcomeBack();
+
+  // ---------- 타이틀 화면 ----------
+  const isNewPlayer = Object.keys(state.owned).length === 0;
+  function setupTitle() {
+    const words = C.name.split(' ');
+    $('#logo-small').textContent = words.length > 1 ? words.slice(0, -1).join(' ') : '';
+    const colors = ['#ffd166', '#ff9aa2', '#8ecbff', '#9be3a6', '#c9a6ff', '#ffb347'];
+    $('#logo-big').innerHTML = [...words[words.length - 1]].map((ch, i) =>
+      `<span style="--c:${colors[i % colors.length]};--d:${i * 0.12}s">${ch}</span>`).join('');
+    // 동물 퍼레이드 (끊김 없이 돌도록 두 번 넣음)
+    const list = C.animals.map((a, i) => `<div class="pa" style="--d:${(i % 4) * 0.15}s">${animalFace(a)}</div>`).join('');
+    $('#parade-track').innerHTML = list + list;
+    // 떠다니는 하트와 별
+    const sky = $('#title-sky');
+    for (let i = 0; i < 14; i++) {
+      const s = document.createElement('span');
+      s.textContent = ['💗', '⭐', '✨', '🫧'][i % 4];
+      s.style.left = `${Math.random() * 100}%`;
+      s.style.top = `${100 + Math.random() * 20}%`;
+      s.style.fontSize = `${14 + Math.random() * 18}px`;
+      s.style.animationDuration = `${8 + Math.random() * 8}s`;
+      s.style.animationDelay = `${-Math.random() * 12}s`;
+      sky.appendChild(s);
     }
+    const have = Object.keys(state.owned).length;
+    $('#title-cta').textContent = isNewPlayer ? '톡! 눌러서 첫 알 깨기' : '톡! 눌러서 시작';
+    $('#title-sub').textContent = isNewPlayer
+      ? `${C.animals.length}종의 동물 친구가 알 속에서 기다려요`
+      : `친구 ${have}마리가 기다리고 있어요 · 도감 ${have}/${C.animals.length}`;
   }
 
-  welcomeBack();
+  let titleStarted = false;
+  function startFromTitle() {
+    if (titleStarted) return;
+    titleStarted = true;
+    const ts = $('#title-screen');
+    if (isNewPlayer) {
+      $('#title-egg').classList.add('crack');
+      if (navigator.vibrate) navigator.vibrate(30);
+      setTimeout(() => {
+        // 첫 알: 시작 동물이 나오는 알을 바로 깨기
+        const animal = animalById[C.starterAnimal] || C.animals[0];
+        const tier = tierById[animal.tier];
+        state.owned[animal.id] = { count: 1, affinity: 0 };
+        state.eggsOpened += 1;
+        save();
+        hatch = { tier, animal, isNew: true, taps: 0, first: true };
+        openEgg(tier);
+        ts.classList.add('leave');
+        setTimeout(() => ts.classList.add('hidden'), 450);
+      }, 600);
+    } else {
+      ts.classList.add('leave');
+      setTimeout(() => ts.classList.add('hidden'), 450);
+      renderCoins(true);
+      if (welcomeMsg) setTimeout(() => toast(welcomeMsg), 500);
+    }
+  }
+  $('#title-screen').addEventListener('click', startFromTitle);
+
+  setupTitle();
   renderCoins();
   renderNest();
   updateFeedBtn();
@@ -510,7 +590,7 @@
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) save();
-    else { welcomeBack(); renderCoins(true); renderNest(); save(); }
+    else { const m = welcomeBack(); if (m) toast(m); renderCoins(true); renderNest(); save(); }
   });
   window.addEventListener('pagehide', save);
 })();
