@@ -25,11 +25,17 @@ window.GAME_CONFIG = {
   streakDays: 7,          // 이 날수만큼 연속이면 보너스 알
   streakMinTier: 'rare',  // 보너스 알의 최소 등급
 
-  // 성장 단계: 친밀도가 min 이상이면 해당 단계, scale은 크기 배율
+  // 방: 동물은 돌아다니지 않고 바닥의 정해진 자리에 앉아 있어요.
+  room: {
+    floorTop: 0.3,   // 방 높이 중 이 비율 아래부터 동물을 앉힘
+    maxSize: 240,    // 동물 그림 최대 너비(px). 마리 수가 적을수록 이 크기에 가까워져요
+  },
+
+  // 성장 단계: 친밀도가 min 이상이면 해당 단계, scale은 자리 크기 대비 배율
   growth: [
-    { id: 'baby',  name: '아기',   min: 0,   scale: 0.75 },
-    { id: 'child', name: '어린이', min: 30,  scale: 0.95 },
-    { id: 'adult', name: '어른',   min: 100, scale: 1.15 },
+    { id: 'baby',  name: '아기',   min: 0,   scale: 0.8 },
+    { id: 'child', name: '어린이', min: 30,  scale: 0.9 },
+    { id: 'adult', name: '어른',   min: 100, scale: 1.0 },
   ],
 
   // 코인 얻기
@@ -52,7 +58,7 @@ window.GAME_CONFIG = {
     { id: 'myth',      name: '신화', rate: 0.2, color: '#ffb3e6', glow: 'rainbow', hatchMin: 480, taps: 12, dupCoins: 300 },
   ],
 
-  // MVP 동물 12종 (등급마다 2종). 그림은 임시로 이모지를 씁니다.
+  // MVP 동물 12종 (등급마다 2종). 그림은 art.js가 전신으로 그리고, emoji는 그림이 없을 때만 씁니다.
   // 나중에 그림 파일이 생기면 emoji 대신 image: 'images/dog.png' 를 넣으면 됩니다.
   animals: [
     { id: 'dog',       name: '강아지',       emoji: '🐶', tier: 'common' },
