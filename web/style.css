@@ -122,7 +122,7 @@ html, body {
   font: inherit; font-weight: 800; font-size: 14px;
   box-shadow: 0 5px 0 #f0c9a6;
 }
-.big-btn .icon { font-size: 34px; line-height: 1; }
+.big-btn .icon { font-size: 30px; line-height: 1; }
 .big-btn.main { background: #ffcf66; box-shadow: 0 5px 0 #e0a43a; }
 .big-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #f0c9a6; }
 .big-btn:disabled { opacity: .45; }
@@ -296,3 +296,55 @@ html, body {
   animation: rub 1.1s ease-in-out infinite; filter: drop-shadow(0 3px 2px rgba(0,0,0,.2));
 }
 @keyframes rub { 0%, 100% { translate: -22px 0; } 50% { translate: 22px 6px; } }
+
+/* ---------- 산책 ---------- */
+#walk-pick { z-index: 12; background: rgba(90, 62, 43, .35); justify-content: flex-end; }
+#walk-pick-grid { width: 100%; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; overflow-y: auto; }
+#walk-pick-grid button {
+  border: 0; background: #fff; border-radius: 18px; padding: 8px 4px; font: inherit; font-weight: 800; font-size: 13px; color: inherit;
+  display: flex; flex-direction: column; align-items: center; box-shadow: 0 3px 0 #f0c9a6;
+}
+#walk-pick-grid .face { font-size: 70px; }
+
+#walk-screen { z-index: 12; justify-content: flex-start; overflow: hidden; touch-action: none; background: #bfe6ff; }
+.wl { position: absolute; left: 0; right: 0; background-repeat: repeat-x; pointer-events: none; }
+.wl-sky { top: 0; bottom: 0; background: linear-gradient(#8fd3ff, #d8f1ff 60%, #fff4d9); }
+#wl-sun { position: absolute; right: 12%; top: 9%; font-size: 64px; filter: drop-shadow(0 0 20px #fff3a0); }
+.wl-far { bottom: 20%; height: 44%; background-size: auto 100%; }
+.wl-mid { bottom: 20%; height: 28%; background-size: auto 100%; }
+.wl-ground { bottom: 0; height: 26%; background-size: auto 100%; }
+#walk-world { position: absolute; inset: 0; }
+.walker { position: absolute; bottom: 9%; width: 150px; font-size: 150px; margin-left: -75px; pointer-events: auto; cursor: pointer; }
+.walker .inner { transform-origin: 50% 100%; }
+.walker.flip .inner { transform: scaleX(-1); }
+.walker.running .art { animation: run .32s ease-in-out infinite; transform-origin: 50% 100%; }
+.walker.sniff .art { animation: sniff .5s ease-in-out infinite; transform-origin: 50% 100%; }
+.walker.jump { animation: jump .6s cubic-bezier(.3, 1.4, .5, 1); }
+.walker::after { content: ""; position: absolute; bottom: 2%; left: 22%; width: 56%; height: 8%; background: rgba(40, 80, 20, .2); border-radius: 50%; z-index: -1; }
+@keyframes run { 0%, 100% { translate: 0 0; rotate: -3deg; } 50% { translate: 0 -12%; rotate: 4deg; } }
+@keyframes sniff { 50% { rotate: 8deg; translate: 3% 2%; } }
+@keyframes jump { 45% { translate: 0 -55%; } }
+.treasure {
+  position: absolute; bottom: 12%; font-size: 40px; width: 56px; height: 56px; margin-left: -28px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; pointer-events: auto;
+  animation: drop .4s ease-out, glint 1s ease-in-out .4s infinite; filter: drop-shadow(0 3px 2px rgba(0,0,0,.2));
+}
+.treasure.got { animation: grab .45s ease-in forwards; pointer-events: none; }
+@keyframes grab { to { transform: translateY(-120px) scale(.4); opacity: 0; } }
+#walk-top {
+  position: relative; z-index: 2; width: 100%; display: flex; align-items: center; gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px 0;
+}
+#walk-timer { flex: 1; height: 16px; background: rgba(255,255,255,.7); border-radius: 999px; overflow: hidden; box-shadow: inset 0 2px 0 rgba(0,0,0,.08); }
+#walk-timer-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #8fd17a, #ffd166); border-radius: 999px; transition: width .25s linear; }
+#walk-count { background: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 900; box-shadow: 0 2px 0 #f0c9a6; }
+#walk-hint { position: relative; z-index: 2; margin-top: 10px; background: rgba(255,255,255,.85); padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 14px; }
+#walk-result { position: absolute; inset: 0; z-index: 5; background: rgba(90, 62, 43, .35); display: flex; align-items: center; justify-content: center; }
+#walk-result .card {
+  background: #fff8f0; border-radius: 28px; padding: 22px 20px; width: 84%; max-width: 360px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; animation: pop .45s cubic-bezier(.2, 1.6, .4, 1);
+}
+#walk-result h2 { margin: 0; font-size: 26px; }
+#walk-result-animal { font-size: 120px; }
+#walk-result-items { font-size: 26px; text-align: center; line-height: 1.4; }
+#walk-result-text { font-weight: 800; text-align: center; margin-bottom: 8px; }

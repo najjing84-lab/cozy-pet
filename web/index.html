@@ -23,6 +23,7 @@
 
     <nav id="bar">
       <button id="btn-feed" class="big-btn"><span class="icon">🍖</span><span class="label">밥 주기</span></button>
+      <button id="btn-walk" class="big-btn"><span class="icon">🌿</span><span class="label">산책</span></button>
       <button id="btn-egg" class="big-btn main"><span class="icon">🥚</span><span class="label" id="egg-label">알 뽑기</span></button>
       <button id="btn-dex" class="big-btn"><span class="icon">📖</span><span class="label">도감</span></button>
     </nav>
@@ -51,6 +52,38 @@
         </div>
         <div id="dex-grid"></div>
         <button id="dex-close" class="pill-btn">닫기</button>
+      </div>
+    </section>
+
+    <!-- 산책: 누구랑 갈지 고르기 -->
+    <section id="walk-pick" class="overlay hidden">
+      <div class="sheet">
+        <h2>누구랑 산책할까요?</h2>
+        <div id="walk-pick-grid"></div>
+        <button id="walk-pick-close" class="pill-btn">닫기</button>
+      </div>
+    </section>
+
+    <!-- 산책: 야생 들판 -->
+    <section id="walk-screen" class="overlay hidden">
+      <div class="wl wl-sky"><div id="wl-sun">☀️</div></div>
+      <div class="wl wl-far"></div>
+      <div class="wl wl-mid"></div>
+      <div class="wl wl-ground"></div>
+      <div id="walk-world"></div>
+      <div id="walk-top">
+        <div id="walk-timer"><div id="walk-timer-fill"></div></div>
+        <div id="walk-count">🪙 0</div>
+      </div>
+      <div id="walk-hint">보물을 톡! 친구를 톡 누르면 점프해요</div>
+      <div id="walk-result" class="hidden">
+        <div class="card">
+          <h2>산책 끝!</h2>
+          <div id="walk-result-animal"></div>
+          <div id="walk-result-items"></div>
+          <div id="walk-result-text"></div>
+          <button id="walk-home" class="pill-btn">집으로</button>
+        </div>
       </div>
     </section>
 
