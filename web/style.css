@@ -214,3 +214,16 @@ html, body {
 }
 @keyframes fadeInOut { 0% { opacity: 0; } 10%, 85% { opacity: 1; } 100% { opacity: 0; } }
 .big-btn.poor { opacity: .6; }
+
+/* 둥지 */
+#nest { display: flex; gap: 10px; justify-content: center; padding: 10px 14px 0; }
+.nest-egg, .nest-empty {
+  min-width: 84px; height: 54px; border-radius: 16px; border: 0;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-weight: 800; color: inherit;
+}
+.nest-egg { background: var(--egg, #fff); box-shadow: 0 3px 0 #e0a43a; font-size: 24px; }
+.nest-egg small { font-size: 13px; }
+.nest-egg.ready { animation: glint 1s ease-in-out infinite; outline: 3px solid #ffcf66; }
+.nest-empty { background: rgba(255,255,255,.5); font-size: 13px; opacity: .7; }
+.big-btn.free { animation: glint 1.2s ease-in-out infinite; }

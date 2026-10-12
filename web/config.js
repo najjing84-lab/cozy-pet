@@ -16,6 +16,22 @@ window.GAME_CONFIG = {
   pityCount: 50,
   pityMinTier: 'hero',
 
+  // 둥지: 알을 사면 둥지에 들어가고, 시간이 지나야 깰 수 있어요.
+  nestSlots: 2,
+  hatchSpeed: 1,  // 1이면 정상 속도. 테스트할 때 60으로 하면 60배 빨라져요.
+
+  // 하루 한 번 무료 알, 연속 출석 보상
+  dailyEgg: true,
+  streakDays: 7,          // 이 날수만큼 연속이면 보너스 알
+  streakMinTier: 'rare',  // 보너스 알의 최소 등급
+
+  // 성장 단계: 친밀도가 min 이상이면 해당 단계, scale은 크기 배율
+  growth: [
+    { id: 'baby',  name: '아기',   min: 0,   scale: 0.75 },
+    { id: 'child', name: '어린이', min: 30,  scale: 0.95 },
+    { id: 'adult', name: '어른',   min: 100, scale: 1.15 },
+  ],
+
   // 코인 얻기
   petCoins: 2,          // 쓰다듬기 한 번
   petCooldownMs: 1200,  // 같은 동물을 다시 쓰다듬어 코인을 받기까지
@@ -28,12 +44,12 @@ window.GAME_CONFIG = {
 
   // 등급: 확률(%) 합계는 100, taps는 알을 깨는 데 필요한 탭 수, dupCoins는 중복일 때 돌려주는 코인
   tiers: [
-    { id: 'common',    name: '흔함', rate: 50,  color: '#ffffff', glow: '#d9d4c7', taps: 4,  dupCoins: 30 },
-    { id: 'uncommon',  name: '보통', rate: 28,  color: '#ffe3a8', glow: '#e8b85c', taps: 5,  dupCoins: 40 },
-    { id: 'rare',      name: '희귀', rate: 14,  color: '#9fd3ff', glow: '#3a9bff', taps: 6,  dupCoins: 60 },
-    { id: 'hero',      name: '영웅', rate: 6,   color: '#c9a6ff', glow: '#8a4dff', taps: 8,  dupCoins: 90 },
-    { id: 'legend',    name: '전설', rate: 1.8, color: '#ffd84d', glow: '#ff9d00', taps: 10, dupCoins: 150 },
-    { id: 'myth',      name: '신화', rate: 0.2, color: '#ffb3e6', glow: 'rainbow', taps: 12, dupCoins: 300 },
+    { id: 'common',    name: '흔함', rate: 50,  color: '#ffffff', glow: '#d9d4c7', hatchMin: 5, taps: 4,  dupCoins: 30 },
+    { id: 'uncommon',  name: '보통', rate: 28,  color: '#ffe3a8', glow: '#e8b85c', hatchMin: 30, taps: 5,  dupCoins: 40 },
+    { id: 'rare',      name: '희귀', rate: 14,  color: '#9fd3ff', glow: '#3a9bff', hatchMin: 120, taps: 6,  dupCoins: 60 },
+    { id: 'hero',      name: '영웅', rate: 6,   color: '#c9a6ff', glow: '#8a4dff', hatchMin: 240, taps: 8,  dupCoins: 90 },
+    { id: 'legend',    name: '전설', rate: 1.8, color: '#ffd84d', glow: '#ff9d00', hatchMin: 360, taps: 10, dupCoins: 150 },
+    { id: 'myth',      name: '신화', rate: 0.2, color: '#ffb3e6', glow: 'rainbow', hatchMin: 480, taps: 12, dupCoins: 300 },
   ],
 
   // MVP 동물 12종 (등급마다 2종). 그림은 임시로 이모지를 씁니다.

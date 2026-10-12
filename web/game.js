@@ -13,7 +13,7 @@
   function newState() {
     const owned = {};
     if (C.starterAnimal) owned[C.starterAnimal] = { count: 1, affinity: 0 };
-    return { coins: C.startCoins, owned, sincePity: 0, eggsOpened: 0, lastSeen: Date.now(), lastFeed: 0 };
+    return { coins: C.startCoins, owned, sincePity: 0, eggsOpened: 0, lastSeen: Date.now(), lastFeed: 0, nest: [], dailyDay: '', streak: 0 };
   }
 
   function load() {
@@ -37,11 +37,9 @@
   // ---------- 화면 기본 ----------
   $('#title').textContent = C.name;
   document.title = C.name;
-  $('#egg-label').textContent = `알 ${C.eggPrice}`;
 
   function renderCoins(bump) {
     $('#coin-count').textContent = state.coins.toLocaleString();
-    $('#btn-egg').classList.toggle('poor', state.coins < C.eggPrice);
     if (bump) {
       const el = $('#coins');
       el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
@@ -90,6 +88,23 @@
     return { x: 50 + Math.random() * (b.width - 100), y: b.height * (0.5 + Math.random() * 0.38) };
   }
 
+  function stageOf(id) {
+    const aff = (state.owned[id] && state.owned[id].affinity) || 0;
+    let st = C.growth[0];
+    for (const g of C.growth) if (aff >= g.min) st = g;
+    return st;
+  }
+
+  function applyStage(pet, id) {
+    const st = stageOf(id);
+    pet.el.style.fontSize = `${64 * st.scale}px`;
+    if (pet.stage && pet.stage !== st.id) {
+      toast(`${animalById[id].name}이(가) ${st.name}로 자랐어요!`);
+      playAnim(pet.el, 'happy');
+    }
+    pet.stage = st.id;
+  }
+
   function placeAnimal(id) {
     const a = animalById[id];
     const el = document.createElement('div');
@@ -103,6 +118,7 @@
     const pet = { el, lastPetCoin: 0, rubDist: 0, x: p.x, y: p.y };
     pets.set(id, pet);
     bindPetting(pet, id);
+    applyStage(pet, id);
     return pet;
   }
 
@@ -139,6 +155,7 @@
     playAnim(pet.el, 'happy');
     const o = state.owned[id];
     o.affinity = (o.affinity || 0) + 1;
+    applyStage(pet, id);
     const now = Date.now();
     if (now - pet.lastPetCoin > C.petCooldownMs) {
       pet.lastPetCoin = now;
@@ -244,8 +261,9 @@
   });
 
   // ---------- 알 뽑기 ----------
-  function rollTier() {
-    const minIdx = state.sincePity + 1 >= C.pityCount ? tierIndex[C.pityMinTier] : 0;
+  function rollTier(forceMin) {
+    let minIdx = state.sincePity + 1 >= C.pityCount ? tierIndex[C.pityMinTier] : 0;
+    if (forceMin) minIdx = Math.max(minIdx, tierIndex[forceMin]);
     const pool = C.tiers.filter((t, i) => i >= minIdx);
     const sum = pool.reduce((s, t) => s + t.rate, 0);
     let r = Math.random() * sum;
@@ -268,18 +286,88 @@
     `<svg viewBox="0 0 100 100" preserveAspectRatio="none"><path id="crack-path" d="${CRACK}" pathLength="100" fill="none" stroke="#5a3e2b" stroke-width="2.4" stroke-linejoin="round" stroke-dasharray="100" stroke-dashoffset="100"/></svg>`;
   const crackPath = $('#crack-path');
 
+  // ---------- 둥지 ----------
+  const nestEl = $('#nest');
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+  const yesterday = () => { const d = new Date(Date.now() - 864e5); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+  const dailyReady = () => C.dailyEgg && state.dailyDay !== today();
+  const fmtLeft = (ms) => {
+    const m = Math.ceil(ms / 60000);
+    return m >= 60 ? `${Math.floor(m / 60)}시간 ${m % 60}분` : `${Math.max(m, 1)}분`;
+  };
+
+  function addToNest(minTier) {
+    const tier = rollTier(minTier);
+    const animal = rollAnimal(tier);
+    // 결과는 바로 저장해서 새로고침으로 다시 뽑을 수 없게 함
+    state.sincePity = tierIndex[tier.id] >= tierIndex[C.pityMinTier] ? 0 : state.sincePity + 1;
+    state.nest.push({ tier: tier.id, animal: animal.id, readyAt: Date.now() + tier.hatchMin * 60000 / C.hatchSpeed });
+    save();
+    renderNest();
+  }
+
+  function renderNest() {
+    const now = Date.now();
+    nestEl.innerHTML = '';
+    state.nest.forEach((e, i) => {
+      const t = tierById[e.tier];
+      const left = e.readyAt - now;
+      const d = document.createElement('button');
+      d.className = `nest-egg${left <= 0 ? ' ready' : ''}`;
+      d.style.setProperty('--egg', t.glow === 'rainbow' ? '#ffb3e6' : t.color);
+      d.innerHTML = `<span>🥚</span><small>${left <= 0 ? '깨기!' : fmtLeft(left)}</small>`;
+      d.addEventListener('click', () => {
+        if (e.readyAt - Date.now() > 0) toast(`${fmtLeft(e.readyAt - Date.now())} 뒤에 깨어나요. 다녀오면 나와 있을 거예요!`);
+        else hatchFromNest(i);
+      });
+      nestEl.appendChild(d);
+    });
+    for (let i = state.nest.length; i < C.nestSlots; i++) {
+      const d = document.createElement('div');
+      d.className = 'nest-empty';
+      d.textContent = '빈 둥지';
+      nestEl.appendChild(d);
+    }
+    const label = $('#egg-label');
+    if (dailyReady()) label.textContent = '무료 알!';
+    else label.textContent = `알 ${C.eggPrice}`;
+    $('#btn-egg').classList.toggle('free', dailyReady());
+    $('#btn-egg').classList.toggle('poor', !dailyReady() && state.coins < C.eggPrice);
+  }
+  setInterval(renderNest, 15000);
+
   $('#btn-egg').addEventListener('click', () => {
+    if (state.nest.length >= C.nestSlots) {
+      toast('둥지가 가득 찼어요. 알이 깨어나면 다시 뽑아요!');
+      return;
+    }
+    if (dailyReady()) {
+      state.streak = state.dailyDay === yesterday() ? state.streak + 1 : 1;
+      state.dailyDay = today();
+      const bonus = state.streak >= C.streakDays;
+      if (bonus) state.streak = 0;
+      addToNest(bonus ? C.streakMinTier : null);
+      toast(bonus
+        ? `${C.streakDays}일 연속 출석! 특별한 알이에요`
+        : `오늘의 무료 알! 연속 ${state.streak}일째 (${C.streakDays}일이면 보너스)`);
+      return;
+    }
     if (state.coins < C.eggPrice) {
       toast(`코인이 ${C.eggPrice - state.coins}개 더 필요해요. 동물을 쓰다듬어 보세요!`);
       return;
     }
     state.coins -= C.eggPrice;
     renderCoins(true);
-    const tier = rollTier();
-    const animal = rollAnimal(tier);
-    // 결과는 바로 저장해서 새로고침으로 다시 뽑을 수 없게 함
+    addToNest(null);
+    toast('알을 둥지에 넣었어요. 곧 깨어날 거예요!');
+  });
+
+  function hatchFromNest(i) {
+    const e = state.nest[i];
+    const tier = tierById[e.tier];
+    const animal = animalById[e.animal];
+    state.nest.splice(i, 1);
     state.eggsOpened += 1;
-    state.sincePity = tierIndex[tier.id] >= tierIndex[C.pityMinTier] ? 0 : state.sincePity + 1;
     const isNew = !state.owned[animal.id];
     if (isNew) state.owned[animal.id] = { count: 1, affinity: 0 };
     else {
@@ -288,9 +376,10 @@
       state.coins += tier.dupCoins;
     }
     save();
+    renderNest();
     hatch = { tier, animal, isNew, taps: 0 };
     openEgg(tier);
-  });
+  }
 
   function openEgg(tier) {
     egg.className = '';
@@ -346,7 +435,7 @@
     renderRoom();
     renderCoins(true);
     const p = pets.get(animal.id);
-    if (p) playAnim(p.el, 'happy');
+    if (p) { applyStage(p, animal.id); playAnim(p.el, 'happy'); }
   });
 
   // ---------- 도감 ----------
@@ -364,7 +453,7 @@
       card.innerHTML =
         `<div class="emoji">${animalFace(a)}</div>` +
         `<div class="name">${o ? a.name : '???'}</div>` +
-        `<div class="meta">${t.name}${o ? ` · 💗${o.affinity}` : ''}</div>`;
+        `<div class="meta">${t.name}${o ? ` · ${stageOf(a.id).name} 💗${o.affinity}` : ''}</div>`;
       grid.appendChild(card);
     }
     $('#dex-progress').textContent = `${have} / ${C.animals.length}`;
@@ -390,13 +479,14 @@
 
   welcomeBack();
   renderCoins();
+  renderNest();
   updateFeedBtn();
   // 방 크기가 정해진 뒤에 동물 배치
   requestAnimationFrame(() => { renderRoom(); save(); });
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) save();
-    else { welcomeBack(); renderCoins(true); save(); }
+    else { welcomeBack(); renderCoins(true); renderNest(); save(); }
   });
   window.addEventListener('pagehide', save);
 })();
