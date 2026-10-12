@@ -72,8 +72,11 @@
     setTimeout(() => el.remove(), 1000);
   }
 
+  // 그림 우선순위: 그림 파일(image) > art.js의 전신 그림 > 이모지
   function animalFace(a) {
-    return a.image ? `<img src="${a.image}" alt="${a.name}" style="width:1em;height:1em;object-fit:contain">` : a.emoji;
+    if (a.image) return `<img src="${a.image}" alt="${a.name}" style="width:1em;height:1.12em;object-fit:contain">`;
+    if (window.ANIMAL_ART && window.ANIMAL_ART.has(a.id)) return window.ANIMAL_ART.drawAnimal(a.id);
+    return a.emoji;
   }
 
   // ---------- 방과 동물 ----------
@@ -82,11 +85,43 @@
 
   function roomBox() { return room.getBoundingClientRect(); }
 
-  function randomSpot() {
+  // 동물은 돌아다니지 않고 방 바닥의 정해진 자리에 앉아 있어요.
+  // 마리 수에 맞춰 자리를 나누고, 적을수록 크게 보여요.
+  function layoutSlots(n) {
     const b = roomBox();
-    // 방 아래쪽(바닥) 위주로 돌아다님
-    return { x: 50 + Math.random() * (b.width - 100), y: b.height * (0.5 + Math.random() * 0.38) };
+    const cols = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
+    const rows = Math.ceil(n / cols);
+    const top = b.height * C.room.floorTop;
+    const bottom = b.height - 12;
+    const rowH = (bottom - top) / rows;
+    const colW = (b.width - 16) / cols;
+    // 뒷줄 동물이 살짝 가려지는 정도는 허용해서 최대한 크게
+    const size = Math.min(C.room.maxSize, colW * 0.95, (rowH / 1.12) * (rows > 1 ? 1.3 : 1));
+    const slots = [];
+    for (let i = 0; i < n; i++) {
+      const r = Math.floor(i / cols);
+      const inRow = r === rows - 1 ? n - r * cols : cols;
+      const c = i % cols;
+      const x = b.width / 2 + (c - (inRow - 1) / 2) * colW;
+      const y = top + rowH * (r + 1); // 발이 닿는 곳
+      slots.push({ x, y, size });
+    }
+    return slots;
   }
+
+  function layoutRoom() {
+    const list = [...pets.values()];
+    const slots = layoutSlots(list.length);
+    list.forEach((p, i) => {
+      const { x, y, size } = slots[i];
+      p.x = x; p.y = y; p.size = size;
+      p.el.style.setProperty('--s', `${size}px`);
+      p.el.style.left = `${x - size / 2}px`;
+      p.el.style.top = `${y - size * 1.12}px`;
+      p.el.style.zIndex = Math.round(y);
+    });
+  }
+  window.addEventListener('resize', layoutRoom);
 
   function stageOf(id) {
     const aff = (state.owned[id] && state.owned[id].affinity) || 0;
@@ -97,7 +132,7 @@
 
   function applyStage(pet, id) {
     const st = stageOf(id);
-    pet.el.style.fontSize = `${64 * st.scale}px`;
+    pet.el.style.setProperty('--g', st.scale);
     if (pet.stage && pet.stage !== st.id) {
       toast(`${animalById[id].name}이(가) ${st.name}로 자랐어요!`);
       playAnim(pet.el, 'happy');
@@ -109,13 +144,10 @@
     const a = animalById[id];
     const el = document.createElement('div');
     el.className = 'animal';
-    el.innerHTML = `<span class="body">${animalFace(a)}</span>`;
-    const p = randomSpot();
-    el.style.left = `${p.x}px`;
-    el.style.top = `${p.y}px`;
+    el.innerHTML = `<div class="body">${animalFace(a)}</div>`;
     el.dataset.id = id;
     room.appendChild(el);
-    const pet = { el, lastPetCoin: 0, rubDist: 0, x: p.x, y: p.y };
+    const pet = { el, lastPetCoin: 0, rubDist: 0, x: 0, y: 0, size: 0 };
     pets.set(id, pet);
     bindPetting(pet, id);
     applyStage(pet, id);
@@ -124,22 +156,24 @@
 
   function renderRoom() {
     for (const id of Object.keys(state.owned)) if (!pets.has(id)) placeAnimal(id);
-    // 깊이 순서: 아래에 있는 동물이 앞으로
-    for (const p of pets.values()) p.el.style.zIndex = Math.round(p.y);
+    layoutRoom();
   }
 
-  function wander() {
+  // 제자리에서 하는 작은 행동: 눈 깜빡, 고개 돌리기, 콩 뛰기
+  function idleLife() {
     for (const p of pets.values()) {
-      if (p.busy || Math.random() < 0.4) continue;
-      const to = randomSpot();
-      p.el.classList.toggle('flip', to.x > p.x);
-      p.x = to.x; p.y = to.y;
-      p.el.style.left = `${to.x}px`;
-      p.el.style.top = `${to.y}px`;
-      p.el.style.zIndex = Math.round(to.y);
+      const r = Math.random();
+      if (r < 0.35) {
+        p.el.classList.add('blink');
+        setTimeout(() => p.el.classList.remove('blink'), 160);
+      } else if (r < 0.45) {
+        p.el.classList.toggle('flip');
+      } else if (r < 0.5) {
+        playAnim(p.el, 'hop');
+      }
     }
   }
-  setInterval(wander, 3500);
+  setInterval(idleLife, 2600);
 
   function playAnim(el, cls) {
     el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
@@ -174,12 +208,6 @@
       e.preventDefault();
       last = { x: e.clientX, y: e.clientY };
       moved = 0;
-      pet.busy = true;
-      // 문지르는 동안은 그 자리에 멈춤
-      const r = pet.el.getBoundingClientRect(); const b = roomBox();
-      pet.el.style.transition = 'none';
-      pet.el.style.left = `${r.left - b.left + r.width / 2}px`;
-      pet.el.style.top = `${r.top - b.top + r.height / 2}px`;
     });
     pet.el.addEventListener('pointermove', (e) => {
       if (!last) return;
@@ -193,12 +221,6 @@
       if (!last) return;
       if (moved < 10) petAnimal(pet, id);
       last = null;
-      setTimeout(() => {
-        const r = pet.el.getBoundingClientRect(); const b = roomBox();
-        pet.x = r.left - b.left + r.width / 2; pet.y = r.top - b.top + r.height / 2;
-        pet.el.style.transition = '';
-        pet.busy = false;
-      }, 600);
     };
     pet.el.addEventListener('pointerup', end);
     pet.el.addEventListener('pointercancel', end);
@@ -215,8 +237,10 @@
     const el = document.createElement('div');
     el.className = 'gift';
     el.textContent = amount >= (lo + hi) / 2 ? '🎁' : '🪙';
-    el.style.left = `${p.x + (Math.random() * 60 - 30)}px`;
-    el.style.top = `${Math.min(p.y + 30, roomBox().height - 30)}px`;
+    // 동물 발치 옆에 선물을 내려놓음
+    const side = Math.random() < 0.5 ? -1 : 1;
+    el.style.left = `${Math.max(24, Math.min(roomBox().width - 24, p.x + side * p.size * 0.42))}px`;
+    el.style.top = `${Math.min(p.y - 14, roomBox().height - 26)}px`;
     el.style.zIndex = 1000;
     el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
